@@ -15,7 +15,8 @@ competitor_query = st.sidebar.text_input("Cerca competitor (es. 'coffee shop')",
 if area:
     # Dati demografici
     with st.spinner(f"Caricamento dati demografici per ZIP {area}..."):
-        df_demo = fetch_demographics_by_zip(area)
+        # Passa la chiave API al modulo census
+        df_demo = fetch_demographics_by_zip(area, api_key=CENSUS_API_KEY)
     if not df_demo.empty:
         st.subheader(f"Dati demografici per ZIP {area}")
         st.dataframe(df_demo)
@@ -33,12 +34,10 @@ if area:
         if not df_comp.empty:
             st.subheader(f"Analisi Competitor: {competitor_query} a ZIP {area}")
             st.dataframe(df_comp)
-            # Visualizza numero recensioni per competitor
+            st.subheader("Numero di recensioni per competitor")
             comp_chart = df_comp.set_index("name")["user_ratings_total"]
             st.bar_chart(comp_chart)
         else:
             st.warning(f"Nessun risultato per {competitor_query} nel ZIP {area}.")
 else:
     st.info("Inserisci un codice ZIP nella sidebar per iniziare l'analisi.")
-
-
