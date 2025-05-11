@@ -1,4 +1,5 @@
-from pytrends.request import TrendReq, ResponseError
+from pytrends.request import TrendReq
+from pytrends.exceptions import ResponseError
 import pandas as pd
 
 # Inizializza PyTrends
@@ -26,6 +27,8 @@ def fetch_google_trends(keyword: str,
     if data.empty:
         return pd.DataFrame()
 
-    # Rimuove la colonna isPartial
-    return data.drop(columns=['isPartial'], errors='ignore') \
-               .rename(columns={keyword: 'trend_volume'})
+    # Rimuove la colonna isPartial, rinomina la colonna dei dati
+    df = data.drop(columns=['isPartial'], errors='ignore')
+    df = df.rename(columns={keyword: 'trend_volume'})
+    return df
+
