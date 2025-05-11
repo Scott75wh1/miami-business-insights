@@ -1,4 +1,5 @@
 import streamlit as st
+from data.trends import fetch_google_trends
 from data.census import fetch_demographics_by_zip
 from data.google_reviews import fetch_google_reviews
 
@@ -11,6 +12,12 @@ st.title("Miami Business Insights 🏝️")
 # Sidebar: selezione area (ZIP code) e keyword competitor
 area = st.sidebar.text_input("Inserisci ZIP code (Miami)", "33101")
 competitor_query = st.sidebar.text_input("Cerca competitor (es. 'coffee shop')", "coffee shop")
+trend_keyword = st.sidebar.text_input("Keyword Trends (es. 'coffee shop')", "coffee shop")
+timeframe = st.sidebar.selectbox(
+    "Intervallo Trends",
+    ['now 7-d', 'today 1-m', 'today 3-m', 'today 12-m']
+)
+
 
 if area:
     # Dati demografici
@@ -41,3 +48,14 @@ if area:
             st.warning(f"Nessun risultato per {competitor_query} nel ZIP {area}.")
 else:
     st.info("Inserisci un codice ZIP nella sidebar per iniziare l'analisi.")
+    # ——————————————————————————————————————————
+# Sezione Google Trends
+if trend_keyword:
+    with st.spinner(f"Caricamento Google Trends per '{trend_keyword}'..."):
+        df_trends = fetch_google_trends(trend_keyword, timeframe=timeframe)
+    if not df_trends.empty:
+        st.subheader(f"Google Trends: {trend_keyword} ({timeframe})")
+        st.line_chart(df_trends['trend_volume'])
+    else:
+        st.warning(f"Nessun dato Trends per '{trend_keyword}' nel periodo selezionato.")
+
