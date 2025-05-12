@@ -16,13 +16,16 @@ def fetch_states(api_key: str) -> pd.DataFrame:
     """
     params = {
         "get": "NAME,STATE",
-        "for": "state:*,"
+        "for": "state:*","  
     }
-    # Aggiungi chiave API
     params["key"] = api_key
-    resp = requests.get(BASE_URL, params=params)
-    resp.raise_for_status()
-    data = resp.json()
+    try:
+        resp = requests.get(BASE_URL, params=params)
+        resp.raise_for_status()
+        data = resp.json()
+    except Exception as e:
+        raise CensusGeoError(f"Errore fetch_states: {e}")
+
     header, *rows = data
     df = pd.DataFrame(rows, columns=header)
     return df.rename(columns={"NAME": "state_name", "STATE": "state_fips"})
@@ -35,13 +38,17 @@ def fetch_places(state_fips: str, api_key: str) -> pd.DataFrame:
     """
     params = {
         "get": "NAME,PLACE",
-        "for": "place:*,",
+        "for": "place:*",
         "in": f"state:{state_fips}"
     }
     params["key"] = api_key
-    resp = requests.get(BASE_URL, params=params)
-    resp.raise_for_status()
-    data = resp.json()
+    try:
+        resp = requests.get(BASE_URL, params=params)
+        resp.raise_for_status()
+        data = resp.json()
+    except Exception as e:
+        raise CensusGeoError(f"Errore fetch_places: {e}")
+
     header, *rows = data
     df = pd.DataFrame(rows, columns=header)
     return df.rename(columns={"NAME": "place_name", "PLACE": "place_fips"})
@@ -54,13 +61,17 @@ def fetch_zipcodes_for_place(state_fips: str, place_fips: str, api_key: str) -> 
     """
     params = {
         "get": "GEOID",
-        "for": "zip code tabulation area:*,",
+        "for": "zip code tabulation area:*",
         "in": f"state:{state_fips}+place:{place_fips}"
     }
     params["key"] = api_key
-    resp = requests.get(BASE_URL, params=params)
-    resp.raise_for_status()
-    data = resp.json()
+    try:
+        resp = requests.get(BASE_URL, params=params)
+        resp.raise_for_status()
+        data = resp.json()
+    except Exception as e:
+        raise CensusGeoError(f"Errore fetch_zipcodes_for_place: {e}")
+
     header, *rows = data
     df = pd.DataFrame(rows, columns=header)
     return df.rename(columns={"GEOID": "zip_code"})
