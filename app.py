@@ -2,6 +2,8 @@ import streamlit as st
 from data.trends import fetch_google_trends
 from data.census import fetch_demographics_by_zip
 from data.google_reviews import fetch_google_reviews
+from data.yelp import fetch_yelp_competitors
+
 
 # Configurazione Streamlit Secrets per API Key
 CENSUS_API_KEY = st.secrets["CENSUS_API_KEY"]
@@ -12,6 +14,7 @@ st.title("Miami Business Insights 🏝️")
 # Sidebar: selezione area (ZIP code) e keyword competitor
 area = st.sidebar.text_input("Inserisci ZIP code (Miami)", "33101")
 competitor_query = st.sidebar.text_input("Cerca competitor (es. 'coffee shop')", "coffee shop")
+yelp_query = st.sidebar.text_input("Yelp competitor (es. 'coffee shop')", "coffee shop")
 trend_keyword = st.sidebar.text_input("Keyword Trends (es. 'coffee shop')", "coffee shop")
 timeframe = st.sidebar.selectbox(
     "Intervallo Trends",
@@ -58,4 +61,18 @@ if trend_keyword:
         st.line_chart(df_trends['trend_volume'])
     else:
         st.warning(f"Nessun dato Trends per '{trend_keyword}' nel periodo selezionato.")
+        # ——————————————————————————————————————————
+# Sezione Yelp Competitor
+if yelp_query:
+    with st.spinner(f"Caricamento dati Yelp per '{yelp_query}'..."):
+        df_yelp = fetch_yelp_competitors(yelp_query, area)
+    if not df_yelp.empty:
+        st.subheader(f"Yelp Competitor: {yelp_query} a ZIP {area}")
+        st.dataframe(df_yelp)
+        st.subheader("Numero di recensioni da Yelp")
+        yelp_chart = df_yelp.set_index("name")["review_count"]
+        st.bar_chart(yelp_chart)
+    else:
+        st.warning(f"Nessun risultato Yelp per {yelp_query} nel ZIP {area}.")
+
 
