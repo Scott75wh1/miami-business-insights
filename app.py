@@ -5,7 +5,12 @@ from streamlit_folium import st_folium
 
 # Modulo geo statico
 from data.geo import get_supported_states, get_cities_for_state, get_zips_for_city
-# Dati e analisi\ nfrom data.census import fetch_demographics_by_zip
+
+# Dati e analisi
+from data.census import fetch_demographics_by_zip
+from data.trends import fetch_google_trends
+from data.google_reviews import fetch_google_reviews
+from data.yelp import fetch_yelp_competitors\ nfrom data.census import fetch_demographics_by_zip
 from data.trends import fetch_google_trends
 from data.google_reviews import fetch_google_reviews
 from data.yelp import fetch_yelp_competitors
