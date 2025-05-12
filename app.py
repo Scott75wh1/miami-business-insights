@@ -210,8 +210,9 @@ if st.sidebar.button('Analizza'):
         else:
             prompt = f"Analizza questi competitor per '{search_term}':"
             for _, r in df_comp.iterrows():
-                prompt += f"
-- [{r['source']}] {r['name']} (rating {r['rating']}, reviews {r['reviews']})"
+     prompt = f"Analizza questi competitor per '{search_term}':"
+for _, r in df_comp.iterrows():
+    prompt += f"- [{r['source']}] {r['name']} (rating {r['rating']}, reviews {r['reviews']})\n"
             with st.spinner('AI analysis in progress...'):
                 try:
                     resp = openai.ChatCompletion.create(
