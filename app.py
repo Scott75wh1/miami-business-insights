@@ -208,9 +208,10 @@ if st.sidebar.button('Analizza'):
         elif df_comp.empty:
             st.warning('No competitor data for AI analysis.')
         else:
-            prompt = f"Analizza questi competitor per '{search_term}':"
+                        prompt = f"Analizza questi competitor per '{search_term}':"
             for _, r in df_comp.iterrows():
                 prompt += f"
+- [{r['source']}] {r['name']} (rating {r['rating']}, reviews {r['reviews']})"
 - [{r['source']}] {r['name']} (rating {r['rating']}, reviews {r['reviews']})"
             with st.spinner('AI analysis in progress...'):
                 try:
