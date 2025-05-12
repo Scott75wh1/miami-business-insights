@@ -3,3 +3,5 @@ requests
 pytrends
 pandas
 python-dotenv
+folium
+streamlit-folium
