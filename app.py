@@ -2,7 +2,7 @@ import streamlit as st
 from data.locations import fetch_states, fetch_places, fetch_zipcodes_for_place
 from data.census import fetch_demographics_by_zip
 from data.trends import fetch_google_trends
-from data.google_reviews import fetch_google_reviews  
+from data.google_reviews import fetch_google_reviews
 from data.yelp import fetch_yelp_competitors
 import folium
 from streamlit_folium import st_folium
