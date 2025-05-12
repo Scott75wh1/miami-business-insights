@@ -148,7 +148,7 @@ enable_ai = st.sidebar.checkbox('Analisi AI', True)
 
 if st.sidebar.button('Analizza'):
     # Demographics
-df_demo = pd.DataFrame()
+    df_demo = pd.DataFrame()
     if enable_demo:
         dfs = []
         for n in selected:
@@ -159,9 +159,9 @@ df_demo = pd.DataFrame()
                 dfs.append(df)
         df_demo = pd.concat(dfs, ignore_index=True) if dfs else pd.DataFrame()
     # Trends
-df_trends = fetch_google_trends(search_term) if enable_trends else pd.DataFrame()
+    df_trends = fetch_google_trends(search_term) if enable_trends else pd.DataFrame()
     # Competitors
-df_comp = pd.DataFrame()
+    df_comp = pd.DataFrame()
     if enable_comp:
         comps = []
         for n in selected:
@@ -171,7 +171,7 @@ df_comp = pd.DataFrame()
         df_comp = pd.concat(comps, ignore_index=True) if comps else pd.DataFrame()
 
     # Tabs
-tabs = st.tabs(['Demografici','Trends','Competitor','Mappa','AI Analysis'])
+    tabs = st.tabs(['Demografici','Trends','Competitor','Mappa','AI Analysis'])
     # Demographics Tab
     with tabs[0]:
         st.subheader('Dati Demografici')
@@ -210,7 +210,8 @@ tabs = st.tabs(['Demografici','Trends','Competitor','Mappa','AI Analysis'])
         else:
             prompt = f"Analizza questi competitor per '{search_term}':"
             for _, r in df_comp.iterrows():
-                prompt += f"\n- [{r['source']}] {r['name']} (rating {r['rating']}, reviews {r['reviews']})"
+                prompt += f"
+- [{r['source']}] {r['name']} (rating {r['rating']}, reviews {r['reviews']})"
             with st.spinner('AI analysis in progress...'):
                 try:
                     resp = openai.ChatCompletion.create(
