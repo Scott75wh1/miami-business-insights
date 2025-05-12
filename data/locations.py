@@ -1,7 +1,8 @@
 import requests
 import pandas as pd
 
-BASE_URL = "https://api.census.gov/data/2020/acs/acs5/geography"
+# Usa l'endpoint ACS5 base per tutte le chiamate Geography
+BASE_URL = "https://api.census.gov/data/2020/acs/acs5"
 
 class CensusGeoError(Exception):
     """Eccezione per errori nel Geography API"""
@@ -15,7 +16,7 @@ def fetch_states(api_key: str) -> pd.DataFrame:
     """
     params = {
         "get": "NAME,STATE",
-        "for": "state:*,",
+        "for": "state:*",
         "key": api_key
     }
     resp = requests.get(BASE_URL, params=params)
@@ -34,7 +35,7 @@ def fetch_places(state_fips: str, api_key: str) -> pd.DataFrame:
     """
     params = {
         "get": "NAME,PLACE",
-        "for": "place:*,",
+        "for": "place:*",
         "in": f"state:{state_fips}",
         "key": api_key
     }
@@ -54,7 +55,7 @@ def fetch_zipcodes_for_place(state_fips: str, place_fips: str, api_key: str) -> 
     """
     params = {
         "get": "GEOID",
-        "for": "zip code tabulation area:*,",
+        "for": "zip code tabulation area:*",
         "in": f"state:{state_fips}+place:{place_fips}",
         "key": api_key
     }
