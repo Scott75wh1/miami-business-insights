@@ -198,7 +198,7 @@ if st.sidebar.button('Analizza'):
         st.subheader('Mappa Interattiva')
         m = folium.Map(location=[25.7617, -80.1918], zoom_start=12)
         st_folium(m)
-            # AI Analysis Tab
+    # AI Analysis Tab
     with tabs[4]:
         st.subheader('Analisi AI')
         if not OPENAI_AVAILABLE:
