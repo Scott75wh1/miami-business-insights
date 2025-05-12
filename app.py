@@ -198,7 +198,7 @@ if st.sidebar.button('Analizza'):
         st.subheader('Mappa Interattiva')
         m = folium.Map(location=[25.7617, -80.1918], zoom_start=12)
         st_folium(m)
-        # AI Analysis Tab
+            # AI Analysis Tab
     with tabs[4]:
         st.subheader('Analisi AI')
         if not OPENAI_AVAILABLE:
@@ -208,10 +208,9 @@ if st.sidebar.button('Analizza'):
         elif df_comp.empty:
             st.warning('No competitor data for AI analysis.')
         else:
-                        prompt = f"Analizza questi competitor per '{search_term}':"
+            prompt = f"Analizza questi competitor per '{search_term}':"
             for _, r in df_comp.iterrows():
                 prompt += f"
-- [{r['source']}] {r['name']} (rating {r['rating']}, reviews {r['reviews']})"
 - [{r['source']}] {r['name']} (rating {r['rating']}, reviews {r['reviews']})"
             with st.spinner('AI analysis in progress...'):
                 try:
