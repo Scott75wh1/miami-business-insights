@@ -44,10 +44,17 @@ def on_generate():
 
 st.sidebar.button("Genera Dashboard", on_click=on_generate)
 
-# Reset del flag se parametri cambiano
-st.experimental_rerun()
+# Bottone Genera Dashboard e gestione stato
+def on_generate():
+    st.session_state.generate = True
+
+st.sidebar.button("Genera Dashboard", on_click=on_generate)
 
 # Mostra dashboard se stato generato
+# Nota: non usare st.experimental_rerun qui per evitare loop
+
+if st.session_state.generate:
+ se stato generato
 if st.session_state.generate:
     tabs = st.tabs(["Demografici", "Trends", "Competitor", "Mappa"]);
     # Demografici
