@@ -198,15 +198,15 @@ if st.sidebar.button('Analizza'):
         st.subheader('Mappa Interattiva')
         m = folium.Map(location=[25.7617, -80.1918], zoom_start=12)
         st_folium(m)
-    # AI Analysis Tab
+        # AI Analysis Tab
     with tabs[4]:
         st.subheader('Analisi AI')
         if not OPENAI_AVAILABLE:
             st.error('OpenAI module non installato.')
         elif not enable_ai:
             st.info('Abilita Analisi AI nella sidebar.')
-                elif df_comp.empty:
-            st.warning('No competitor data for AI analysis.')
+        elif df_comp.empty:
+            st.warning('Nessun dato competitor per l\'analisi AI.')
         else:
             prompt = f"Analizza questi competitor per '{search_term}':"
             for _, r in df_comp.iterrows():
@@ -216,7 +216,7 @@ if st.sidebar.button('Analizza'):
                 try:
                     resp = openai.ChatCompletion.create(
                         model='gpt-4',
-                        messages=[{'role':'user','content':prompt}],
+                        messages=[{'role': 'user', 'content': prompt}],
                         max_tokens=500
                     )
                     st.markdown(resp.choices[0].message.content)
