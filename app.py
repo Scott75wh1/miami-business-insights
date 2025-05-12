@@ -20,6 +20,14 @@ CENSUS_API_KEY = st.secrets["CENSUS_API_KEY"]
 YELP_API_KEY = st.secrets["YELP_API_KEY"]
 GOOGLE_PLACES_KEY = st.secrets["GOOGLE_PLACES_KEY"]
 
+# Inizializza lo stato di esecuzione
+if 'run_dashboard' not in st.session_state:
+    st.session_state.run_dashboard = False
+
+# Callback per il pulsante
+def run_callback():
+    st.session_state.run_dashboard = True
+
 # --- Sidebar: Flusso gerarchico ---
 st.sidebar.header("1. Seleziona Area Geografica")
 # 1. Stato
@@ -45,72 +53,76 @@ enable_google = st.sidebar.checkbox("Google Reviews", value=True)
 enable_yelp = st.sidebar.checkbox("Yelp", value=True)
 
 # Pulsante per generare la dashboard
-if st.sidebar.button("Genera Dashboard"):
-    # Creazione dei tab
-    tabs = st.tabs(["Demografici", "Trends", "Competitor", "Mappa"] )
+st.sidebar.button("Genera Dashboard", on_click=run_callback)
 
-    # Tab 1: Dati Demografici
-    if enable_demo:
-        with tabs[0]:
-            st.subheader(f"Dati Demografici per {city}, {state} (ZIP {zip_code})")
-            try:
-                df_demo = fetch_demographics_by_zip(zip_code, api_key=CENSUS_API_KEY)
-                if not df_demo.empty:
-                    st.dataframe(df_demo)
-                    chart = df_demo[["population", "median_age", "median_income"]].T
-                    chart.columns = [zip_code]
-                    st.bar_chart(chart)
-                else:
-                    st.warning("Nessun dato demografico disponibile.")
-            except Exception as e:
-                st.error(f"Errore caricamento dati demografici: {e}")
-
-    # Tab 2: Google Trends
-    if enable_trends:
-        with tabs[1]:
-            st.subheader(f"Google Trends: {search_term}")
-            timeframe = st.selectbox("Intervallo temporale:", ["now 7-d", "today 1-m", "today 3-m", "today 12-m"], key="tf")
-            df_trends = fetch_google_trends(keyword=search_term, timeframe=timeframe)
-            if not df_trends.empty:
-                st.line_chart(df_trends["trend_volume"])
-            else:
-                st.warning("Nessun dato Google Trends disponibile.")
-
-    # Tab 3: Analisi Competitor
-    if enable_google or enable_yelp:
-        with tabs[2]:
-            st.subheader(f"Analisi Competitor: {search_term}")
-            if enable_google:
-                st.markdown("**Google Reviews**")
-                df_g = fetch_google_reviews(query=search_term, zip_code=zip_code)
-                if not df_g.empty:
-                    st.dataframe(df_g)
-                    if 'name' in df_g.columns and 'user_ratings_total' in df_g.columns:
-                        st.bar_chart(df_g.set_index('name')['user_ratings_total'])
-                else:
-                    st.warning("Nessun risultato in Google Reviews.")
-            if enable_yelp:
-                st.markdown("**Yelp**")
-                df_y = fetch_yelp_competitors(term=search_term, zip_code=zip_code)
-                if not df_y.empty:
-                    st.dataframe(df_y)
-                    if 'name' in df_y.columns and 'review_count' in df_y.columns:
-                        st.bar_chart(df_y.set_index('name')['review_count'])
-                else:
-                    st.warning("Nessun risultato in Yelp.")
-
-    # Tab 4: Mappa Interattiva
-    with tabs[3]:
-        st.subheader("Mappa Interattiva")
-        # Coordinate placeholder; in futuro geocoding dell'indirizzo
-        lat, lon = 25.7617, -80.1918
-        m = folium.Map(location=[lat, lon], zoom_start=12)
-        if enable_google and 'df_g' in locals() and not df_g.empty:
-            for _, row in df_g.iterrows():
-                folium.Marker([lat, lon], popup=row['name']).add_to(m)
-        if enable_yelp and 'df_y' in locals() and not df_y.empty:
-            for _, row in df_y.iterrows():
-                folium.Marker([lat, lon], icon=folium.Icon(color='red'), popup=row['name']).add_to(m)
-        st_folium(m, width=700)
-else:
+# Se non premuto, mostra istruzioni e evita rerun
+if not st.session_state.run_dashboard:
     st.info("Configura area, settore e fonti nella sidebar, poi clicca 'Genera Dashboard'.")
+    st.stop()
+
+# Dopo il click, visualizza i tab
+tabs = st.tabs(["Demografici", "Trends", "Competitor", "Mappa"] )
+
+# Tab 1: Dati Demografici
+if enable_demo:
+    with tabs[0]:
+        st.subheader(f"Dati Demografici per {city}, {state} (ZIP {zip_code})")
+        try:
+            df_demo = fetch_demographics_by_zip(zip_code, api_key=CENSUS_API_KEY)
+            if not df_demo.empty:
+                st.dataframe(df_demo)
+                chart = df_demo[["population", "median_age", "median_income"]].T
+                chart.columns = [zip_code]
+                st.bar_chart(chart)
+            else:
+                st.warning("Nessun dato demografico disponibile.")
+        except Exception as e:
+            st.error(f"Errore caricamento dati demografici: {e}")
+
+# Tab 2: Google Trends
+if enable_trends:
+    with tabs[1]:
+        st.subheader(f"Google Trends: {search_term}")
+        timeframe = st.selectbox("Intervallo temporale:", ["now 7-d", "today 1-m", "today 3-m", "today 12-m"], key="tf")
+        df_trends = fetch_google_trends(keyword=search_term, timeframe=timeframe)
+        if not df_trends.empty:
+            st.line_chart(df_trends["trend_volume"])
+        else:
+            st.warning("Nessun dato Google Trends disponibile.")
+
+# Tab 3: Analisi Competitor
+if enable_google or enable_yelp:
+    with tabs[2]:
+        st.subheader(f"Analisi Competitor: {search_term}")
+        if enable_google:
+            st.markdown("**Google Reviews**")
+            df_g = fetch_google_reviews(query=search_term, zip_code=zip_code)
+            if not df_g.empty:
+                st.dataframe(df_g)
+                if 'name' in df_g.columns and 'user_ratings_total' in df_g.columns:
+                    st.bar_chart(df_g.set_index('name')['user_ratings_total'])
+            else:
+                st.warning("Nessun risultato in Google Reviews.")
+        if enable_yelp:
+            st.markdown("**Yelp**")
+            df_y = fetch_yelp_competitors(term=search_term, zip_code=zip_code)
+            if not df_y.empty:
+                st.dataframe(df_y)
+                if 'name' in df_y.columns and 'review_count' in df_y.columns:
+                    st.bar_chart(df_y.set_index('name')['review_count'])
+            else:
+                st.warning("Nessun risultato in Yelp.")
+
+# Tab 4: Mappa Interattiva
+with tabs[3]:
+    st.subheader("Mappa Interattiva")
+    # Coordinate placeholder; in futuro geocoding dell'indirizzo
+    lat, lon = 25.7617, -80.1918
+    m = folium.Map(location=[lat, lon], zoom_start=12)
+    if enable_google and 'df_g' in locals() and not df_g.empty:
+        for _, row in df_g.iterrows():
+            folium.Marker([lat, lon], popup=row['name']).add_to(m)
+    if enable_yelp and 'df_y' in locals() and not df_y.empty:
+        for _, row in df_y.iterrows():
+            folium.Marker([lat, lon], icon=folium.Icon(color='red'), popup=row['name']).add_to(m)
+    st_folium(m, width=700)
