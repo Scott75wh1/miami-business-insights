@@ -68,14 +68,22 @@ if st.sidebar.button("Genera Dashboard"):
                 if google_kw:
                     df_g = fetch_google_reviews(google_kw, area)
                     st.dataframe(df_g)
-                    st.bar_chart(df_g.set_index('name')['user_ratings_total'])
+                    # Verifica colonne prima di plottare
+                    if 'name' in df_g.columns and 'user_ratings_total' in df_g.columns:
+                        st.bar_chart(df_g.set_index('name')['user_ratings_total'])
+                    else:
+                        st.warning('Impossibile creare il grafico Google Reviews: dati mancanti.')
             if enable_yelp:
                 st.markdown("**Yelp**")
                 yelp_kw = st.text_input("Keyword Yelp:", custom_query)
                 if yelp_kw:
                     df_y = fetch_yelp_competitors(yelp_kw, area)
                     st.dataframe(df_y)
-                    st.bar_chart(df_y.set_index('name')['review_count'])
+                    # Verifica colonne prima di plottare
+                    if 'name' in df_y.columns and 'review_count' in df_y.columns:
+                        st.bar_chart(df_y.set_index('name')['review_count'])
+                    else:
+                        st.warning('Impossibile creare il grafico Yelp: dati mancanti.')
     # Mappa
     with tabs[3]:
         st.subheader("Mappa Interattiva")
@@ -90,7 +98,7 @@ if st.sidebar.button("Genera Dashboard"):
             m = folium.Map(location=[lat, lon], zoom_start=13)
 
             # Aggiungi marker per competitor Google
-            if enable_google and 'df_g' in locals():
+            if enable_google and 'df_g' in locals() and not df_g.empty:
                 for _, row in df_g.iterrows():
                     # Qui potremmo usare geocoding per l'indirizzo
                     folium.Marker([lat, lon],
@@ -108,6 +116,3 @@ if st.sidebar.button("Genera Dashboard"):
 else:
     st.info("Completa i tre step nella sidebar e clicca 'Genera Dashboard' per visualizzare l'analisi.")
     st.info("Completa i tre step nella sidebar e clicca 'Genera Dashboard' per visualizzare l'analisi.")
-
-
-
