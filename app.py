@@ -5,12 +5,8 @@ from streamlit_folium import st_folium
 
 # Modulo geo statico
 from data.geo import get_supported_states, get_cities_for_state, get_zips_for_city
-
-# Dati e analisi
+# Moduli analisi
 from data.census import fetch_demographics_by_zip
-from data.trends import fetch_google_trends
-from data.google_reviews import fetch_google_reviews
-from data.yelp import fetch_yelp_competitors\ nfrom data.census import fetch_demographics_by_zip
 from data.trends import fetch_google_trends
 from data.google_reviews import fetch_google_reviews
 from data.yelp import fetch_yelp_competitors
@@ -19,7 +15,7 @@ from data.yelp import fetch_yelp_competitors
 st.set_page_config(page_title="Business Insights USA", layout="wide")
 st.title("Business Insights USA 🗺️")
 
-# Carica API Keys da Secrets
+# Carica API Keys da Streamlit Secrets
 CENSUS_API_KEY = st.secrets["CENSUS_API_KEY"]
 YELP_API_KEY = st.secrets["YELP_API_KEY"]
 GOOGLE_PLACES_KEY = st.secrets["GOOGLE_PLACES_KEY"]
@@ -32,7 +28,7 @@ state = st.sidebar.selectbox("Stato:", states)
 # 2. Città
 cities_df = get_cities_for_state(state)
 city = st.sidebar.selectbox("Città:", cities_df["city_name"].tolist())
-# 3. ZIP
+# 3. ZIP code
 zips_df = get_zips_for_city(city)
 zip_code = st.sidebar.selectbox("ZIP code:", zips_df["zip_code"].tolist())
 
@@ -40,19 +36,20 @@ zip_code = st.sidebar.selectbox("ZIP code:", zips_df["zip_code"].tolist())
 st.sidebar.header("2. Settore & Fonti")
 categories = ["Ristorazione", "Retail", "Servizi", "Personal Care", "Altro"]
 category = st.sidebar.selectbox("Categoria di attività:", categories)
-custom = st.sidebar.text_input("Query personalizzata (opzionale):")
-search_term = custom.strip() if custom.strip() else category
-# Fonti
-enable_demo = st.sidebar.checkbox("Dati Demografici", True)
-enable_trends = st.sidebar.checkbox("Google Trends", True)
-enable_google = st.sidebar.checkbox("Google Reviews", True)
-enable_yelp = st.sidebar.checkbox("Yelp", True)
+custom_term = st.sidebar.text_input("Query personalizzata (opzionale):", "")
+search_term = custom_term.strip() if custom_term.strip() else category
+# Fonti dati
+enable_demo = st.sidebar.checkbox("Dati Demografici", value=True)
+enable_trends = st.sidebar.checkbox("Google Trends", value=True)
+enable_google = st.sidebar.checkbox("Google Reviews", value=True)
+enable_yelp = st.sidebar.checkbox("Yelp", value=True)
 
-# Bottone per generare la dashboard
+# Pulsante per generare la dashboard
 if st.sidebar.button("Genera Dashboard"):
-    tabs = st.tabs(["Demografici", "Trends", "Competitor", "Mappa"])
+    # Creazione dei tab
+    tabs = st.tabs(["Demografici", "Trends", "Competitor", "Mappa"] )
 
-    # --- Tab 1: Demografici ---
+    # Tab 1: Dati Demografici
     if enable_demo:
         with tabs[0]:
             st.subheader(f"Dati Demografici per {city}, {state} (ZIP {zip_code})")
@@ -66,20 +63,20 @@ if st.sidebar.button("Genera Dashboard"):
                 else:
                     st.warning("Nessun dato demografico disponibile.")
             except Exception as e:
-                st.error(f"Errore caricamento demografici: {e}")
+                st.error(f"Errore caricamento dati demografici: {e}")
 
-    # --- Tab 2: Google Trends ---
+    # Tab 2: Google Trends
     if enable_trends:
         with tabs[1]:
             st.subheader(f"Google Trends: {search_term}")
-            timeframe = st.selectbox("Intervallo temporale:", ['now 7-d', 'today 1-m', 'today 3-m', 'today 12-m'], key='tf')
+            timeframe = st.selectbox("Intervallo temporale:", ["now 7-d", "today 1-m", "today 3-m", "today 12-m"], key="tf")
             df_trends = fetch_google_trends(keyword=search_term, timeframe=timeframe)
             if not df_trends.empty:
-                st.line_chart(df_trends['trend_volume'])
+                st.line_chart(df_trends["trend_volume"])
             else:
                 st.warning("Nessun dato Google Trends disponibile.")
 
-    # --- Tab 3: Competitor ---
+    # Tab 3: Analisi Competitor
     if enable_google or enable_yelp:
         with tabs[2]:
             st.subheader(f"Analisi Competitor: {search_term}")
@@ -88,7 +85,8 @@ if st.sidebar.button("Genera Dashboard"):
                 df_g = fetch_google_reviews(query=search_term, zip_code=zip_code)
                 if not df_g.empty:
                     st.dataframe(df_g)
-                    st.bar_chart(df_g.set_index('name')['user_ratings_total'])
+                    if 'name' in df_g.columns and 'user_ratings_total' in df_g.columns:
+                        st.bar_chart(df_g.set_index('name')['user_ratings_total'])
                 else:
                     st.warning("Nessun risultato in Google Reviews.")
             if enable_yelp:
@@ -96,14 +94,15 @@ if st.sidebar.button("Genera Dashboard"):
                 df_y = fetch_yelp_competitors(term=search_term, zip_code=zip_code)
                 if not df_y.empty:
                     st.dataframe(df_y)
-                    st.bar_chart(df_y.set_index('name')['review_count'])
+                    if 'name' in df_y.columns and 'review_count' in df_y.columns:
+                        st.bar_chart(df_y.set_index('name')['review_count'])
                 else:
                     st.warning("Nessun risultato in Yelp.")
 
-    # --- Tab 4: Mappa ---
+    # Tab 4: Mappa Interattiva
     with tabs[3]:
         st.subheader("Mappa Interattiva")
-        # Placeholder coordinate, da sostituire con geocoding
+        # Coordinate placeholder; in futuro geocoding dell'indirizzo
         lat, lon = 25.7617, -80.1918
         m = folium.Map(location=[lat, lon], zoom_start=12)
         if enable_google and 'df_g' in locals() and not df_g.empty:
@@ -114,4 +113,4 @@ if st.sidebar.button("Genera Dashboard"):
                 folium.Marker([lat, lon], icon=folium.Icon(color='red'), popup=row['name']).add_to(m)
         st_folium(m, width=700)
 else:
-    st.info("Seleziona area, settore e fonti nella sidebar, poi clicca 'Genera Dashboard'.")
+    st.info("Configura area, settore e fonti nella sidebar, poi clicca 'Genera Dashboard'.")
