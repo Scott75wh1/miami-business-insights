@@ -205,7 +205,7 @@ if st.sidebar.button('Analizza'):
             st.error('OpenAI module non installato.')
         elif not enable_ai:
             st.info('Abilita Analisi AI nella sidebar.')
-        elif df_comp.empty:
+                elif df_comp.empty:
             st.warning('No competitor data for AI analysis.')
         else:
             prompt = f"Analizza questi competitor per '{search_term}':"
