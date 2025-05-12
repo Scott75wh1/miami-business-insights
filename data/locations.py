@@ -16,7 +16,7 @@ def fetch_states(api_key: str) -> pd.DataFrame:
     """
     params = {
         "get": "NAME,STATE",
-        "for": "state:*","  
+        "for": "state:*"
     }
     params["key"] = api_key
     try:
