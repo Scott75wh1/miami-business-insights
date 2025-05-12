@@ -1,11 +1,11 @@
 import requests
 import pandas as pd
 
-# Usa l'endpoint ACS5 base per tutte le chiamate Geography
+# Base URL dell'API ACS5 per geografie
 BASE_URL = "https://api.census.gov/data/2020/acs/acs5"
 
 class CensusGeoError(Exception):
-    """Eccezione per errori nel Geography API"""
+    """Eccezione per errori nelle chiamate Geography API"""
     pass
 
 
@@ -19,10 +19,13 @@ def fetch_states(api_key: str) -> pd.DataFrame:
         "for": "state:*","
         "key": api_key
     }
-    resp = requests.get(BASE_URL, params=params)
-    if resp.status_code != 200:
-        raise CensusGeoError(f"HTTP {resp.status_code}: {resp.text}")
-    data = resp.json()
+    try:
+        resp = requests.get(BASE_URL, params=params)
+        resp.raise_for_status()
+        data = resp.json()
+    except Exception as e:
+        raise CensusGeoError(f"Errore fetch_states: {e}")
+
     header, *rows = data
     df = pd.DataFrame(rows, columns=header)
     return df.rename(columns={"NAME": "state_name", "STATE": "state_fips"})
@@ -39,10 +42,13 @@ def fetch_places(state_fips: str, api_key: str) -> pd.DataFrame:
         "in": f"state:{state_fips}",
         "key": api_key
     }
-    resp = requests.get(BASE_URL, params=params)
-    if resp.status_code != 200:
-        raise CensusGeoError(f"HTTP {resp.status_code}: {resp.text}")
-    data = resp.json()
+    try:
+        resp = requests.get(BASE_URL, params=params)
+        resp.raise_for_status()
+        data = resp.json()
+    except Exception as e:
+        raise CensusGeoError(f"Errore fetch_places: {e}")
+
     header, *rows = data
     df = pd.DataFrame(rows, columns=header)
     return df.rename(columns={"NAME": "place_name", "PLACE": "place_fips"})
@@ -53,24 +59,19 @@ def fetch_zipcodes_for_place(state_fips: str, place_fips: str, api_key: str) -> 
     Dato state_fips e place_fips, recupera i ZIP code tabulation areas (ZCTAs) all'interno del comune.
     Restituisce un DataFrame con colonna: zip_code.
     """
-    params = [
-        ("get", "GEOID"),
-        ("for", "zip%20code%20tabulation%20area:*)"),
-        ("in", f"state:{state_fips}"),
-        ("in", f"place:{place_fips}"),
-        ("key", api_key)
-    ]
-    # Nota: urlencode dei parametri gestisce spazi con %20
-    resp = requests.get(BASE_URL, params=params)
-    if resp.status_code != 200:
-        raise CensusGeoError(f"HTTP {resp.status_code}: {resp.text}")
+    params = {
+        "get": "GEOID",
+        "for": "zip code tabulation area:*","
+        "in": f"state:{state_fips}+place:{place_fips}",
+        "key": api_key
+    }
     try:
+        resp = requests.get(BASE_URL, params=params)
+        resp.raise_for_status()
         data = resp.json()
-    except ValueError:
-        raise CensusGeoError(f"Risposta non valida: {resp.text[:200]}")
-    if not isinstance(data, list) or len(data) < 2:
-        # Nessun ZCTA trovato
-        return pd.DataFrame(columns=["zip_code"])
+    except Exception as e:
+        raise CensusGeoError(f"Errore fetch_zipcodes_for_place: {e}")
+
     header, *rows = data
     df = pd.DataFrame(rows, columns=header)
     return df.rename(columns={"GEOID": "zip_code"})
