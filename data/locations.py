@@ -16,9 +16,9 @@ def fetch_states(api_key: str) -> pd.DataFrame:
     """
     params = {
         "get": "NAME,STATE",
-        "for": "state:*"
+        "for": "state:*",
+        "key": api_key
     }
-    params["key"] = api_key
     try:
         resp = requests.get(BASE_URL, params=params)
         resp.raise_for_status()
@@ -39,9 +39,9 @@ def fetch_places(state_fips: str, api_key: str) -> pd.DataFrame:
     params = {
         "get": "NAME,PLACE",
         "for": "place:*",
-        "in": f"state:{state_fips}"
+        "in": f"state:{state_fips}",
+        "key": api_key
     }
-    params["key"] = api_key
     try:
         resp = requests.get(BASE_URL, params=params)
         resp.raise_for_status()
@@ -52,26 +52,3 @@ def fetch_places(state_fips: str, api_key: str) -> pd.DataFrame:
     header, *rows = data
     df = pd.DataFrame(rows, columns=header)
     return df.rename(columns={"NAME": "place_name", "PLACE": "place_fips"})
-
-
-def fetch_zipcodes_for_place(state_fips: str, place_fips: str, api_key: str) -> pd.DataFrame:
-    """
-    Dato state_fips e place_fips, recupera i ZIP code tabulation areas (ZCTAs) all'interno del comune.
-    Restituisce un DataFrame con colonna: zip_code.
-    """
-    params = {
-        "get": "GEOID",
-        "for": "zip code tabulation area:*",
-        "in": f"state:{state_fips}+place:{place_fips}"
-    }
-    params["key"] = api_key
-    try:
-        resp = requests.get(BASE_URL, params=params)
-        resp.raise_for_status()
-        data = resp.json()
-    except Exception as e:
-        raise CensusGeoError(f"Errore fetch_zipcodes_for_place: {e}")
-
-    header, *rows = data
-    df = pd.DataFrame(rows, columns=header)
-    return df.rename(columns={"GEOID": "zip_code"})
