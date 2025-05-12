@@ -1,146 +1,203 @@
-import os
-import sys
-import pathlib
-import importlib.util
 import streamlit as st
+import requests
+import pandas as pd
+from pytrends.request import TrendReq
 import folium
 from streamlit_folium import st_folium
 
-# --- Debug: verifica struttura del progetto ---
-st.write("Working directory:", os.getcwd())
-st.write("sys.path:", sys.path)
-root_files = os.listdir(os.getcwd())
-st.write("Root files:", root_files)
-if "data" in root_files:
-    st.write("Data directory contents:", os.listdir(os.path.join(os.getcwd(), "data")))
-else:
-    st.error("'data' directory not found in project root.")
+# --- API KEYS ---
+CENSUS_API_KEY = st.secrets.get("CENSUS_API_KEY")
+YELP_API_KEY = st.secrets.get("YELP_API_KEY")
+GOOGLE_PLACES_KEY = st.secrets.get("GOOGLE_PLACES_KEY")
 
-# ---- Caricamento dinamico dei moduli da 'data/' ----
-DATA_DIR = pathlib.Path(__file__).parent / "data"
+# --- CONSTANTS ---
+CENSUS_BASE = "https://api.census.gov/data/2020/acs/acs5"
 
-def load_module(name):
-    path = DATA_DIR / f"{name}.py"
-    if not path.exists():
-        st.error(f"Module file not found: {path}")
-        return None
-    spec = importlib.util.spec_from_file_location(name, str(path))
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module
+# --- Functions ---
 
-locations = load_module("locations")
-census_api = load_module("census")
-trends_mod = load_module("trends")
-google_reviews_mod = load_module("google_reviews")
-yelp_mod = load_module("yelp")
+def fetch_states():
+    params = {"get": "NAME,STATE", "for": "state:*", "key": CENSUS_API_KEY}
+    resp = requests.get(CENSUS_BASE, params=params)
+    resp.raise_for_status()
+    data = resp.json()
+    df = pd.DataFrame(data[1:], columns=data[0])
+    return df.rename(columns={"NAME": "state_name", "STATE": "state_fips"})
 
-# Stop if modules missing
-if not locations or not census_api:
-    st.stop()
 
-# Configurazione pagina
+def fetch_places(state_fips):
+    params = {"get": "NAME,PLACE", "for": "place:*","
+              "in": f"state:{state_fips}", "key": CENSUS_API_KEY}
+    resp = requests.get(CENSUS_BASE, params=params)
+    resp.raise_for_status()
+    data = resp.json()
+    df = pd.DataFrame(data[1:], columns=data[0])
+    return df.rename(columns={"NAME": "place_name", "PLACE": "place_fips"})
+
+
+def fetch_zipcodes(state_fips, place_fips):
+    params = {"get": "GEOID", "for": "zip code tabulation area:*","
+              "in": f"state:{state_fips}+place:{place_fips}", "key": CENSUS_API_KEY}
+    resp = requests.get(CENSUS_BASE, params=params)
+    resp.raise_for_status()
+    data = resp.json()
+    df = pd.DataFrame(data[1:], columns=data[0])
+    return df.rename(columns={"GEOID": "zip_code"})
+
+
+def fetch_demographics(zip_code):
+    vars_map = {"B01003_001E": "population",
+                "B01002_001E": "median_age",
+                "B19013_001E": "median_income"}
+    params = {"get": ",".join(vars_map.keys()),
+              "for": f"zip code tabulation area:{zip_code}",
+              "key": CENSUS_API_KEY}
+    resp = requests.get(CENSUS_BASE, params=params)
+    resp.raise_for_status()
+    data = resp.json()
+    df = pd.DataFrame(data[1:], columns=data[0])
+    df = df.rename(columns=vars_map)
+    for col in vars_map.values():
+        df[col] = pd.to_numeric(df[col], errors='coerce')
+    return df
+
+# Google Trends
+pytrends = TrendReq(hl='en-US', tz=360)
+
+def fetch_google_trends(keyword, timeframe):
+    pytrends.build_payload([keyword], timeframe=timeframe)
+    data = pytrends.interest_over_time()
+    if data.empty:
+        return pd.DataFrame()
+    df = data.drop(columns=['isPartial'], errors='ignore')
+    return df.rename(columns={keyword: 'trend_volume'})
+
+# Google Reviews
+
+def fetch_google_reviews(query, zip_code, radius=5000, max_results=10):
+    SEARCH_URL = "https://maps.googleapis.com/maps/api/place/textsearch/json"
+    DETAILS_URL = "https://maps.googleapis.com/maps/api/place/details/json"
+    places = requests.get(SEARCH_URL, params={
+        "query": f"{query} in {zip_code}",
+        "key": GOOGLE_PLACES_KEY,
+        "radius": radius,
+        "type": "establishment"
+    }).json().get('results', [])[:max_results]
+    records = []
+    for p in places:
+        pid = p.get('place_id')
+        name = p.get('name')
+        addr = p.get('formatted_address')
+        det = requests.get(DETAILS_URL, params={
+            "place_id": pid,
+            "key": GOOGLE_PLACES_KEY,
+            "fields": "rating,user_ratings_total"
+        }).json().get('result', {})
+        records.append({
+            'name': name,
+            'rating': det.get('rating'),
+            'user_ratings_total': det.get('user_ratings_total'),
+            'address': addr
+        })
+    return pd.DataFrame(records)
+
+# Yelp
+
+def fetch_yelp_competitors(term, zip_code, radius=5000, limit=10):
+    URL = "https://api.yelp.com/v3/businesses/search"
+    headers = {"Authorization": f"Bearer {YELP_API_KEY}"}
+    data = requests.get(URL, headers=headers, params={
+        'term': term,
+        'location': zip_code,
+        'radius': radius,
+        'limit': limit
+    }).json().get('businesses', [])
+    records = []
+    for b in data:
+        records.append({
+            'name': b.get('name'),
+            'rating': b.get('rating'),
+            'review_count': b.get('review_count'),
+            'address': ' • '.join(b.get('location', {}).get('display_address', []))
+        })
+    return pd.DataFrame(records)
+
+# --- Streamlit UI ---
 st.set_page_config(page_title="Business Insights USA", layout="wide")
 st.title("Business Insights USA 🗺️")
 
-# API Key
-CENSUS_API_KEY = st.secrets.get("CENSUS_API_KEY")
+# Sidebar selection
+st.sidebar.header("1. Selezione Area")
+states_df = fetch_states()
+state = st.sidebar.selectbox("Stato:", states_df['state_name'].tolist())
+fips = states_df.loc[states_df['state_name']==state, 'state_fips'].iat[0]
+places_df = fetch_places(fips)
+city = st.sidebar.selectbox("Città:", places_df['place_name'].tolist())
+pf = places_df.loc[places_df['place_name']==city, 'place_fips'].iat[0]
+zips_df = fetch_zipcodes(fips, pf)
+zip_code = st.sidebar.selectbox("ZIP code:", zips_df['zip_code'].tolist())
 
-# --- Sidebar: selezione geografica ---
-st.sidebar.header("1. Selezione Area Geografica")
-# Stato
-states_df = locations.fetch_states(CENSUS_API_KEY)
-states = states_df["state_name"].tolist()
-state_sel = st.sidebar.selectbox("Seleziona Stato:", states)
-state_fips = states_df.loc[states_df["state_name"] == state_sel, "state_fips"].iat[0]
-# Città
-places_df = locations.fetch_places(state_fips, CENSUS_API_KEY)
-places = places_df["place_name"].tolist()
-city_sel = st.sidebar.selectbox("Seleziona Città:", places)
-place_fips = places_df.loc[places_df["place_name"] == city_sel, "place_fips"].iat[0]
-# ZIP codes
-zips_df = locations.fetch_zipcodes_for_place(state_fips, place_fips, CENSUS_API_KEY)
-zip_codes = zips_df["zip_code"].tolist()
-zip_sel = st.sidebar.selectbox("Seleziona ZIP code:", zip_codes)
-
-# --- Sidebar: settore e fonti ---
 st.sidebar.header("2. Settore & Fonti")
-categories = ["Ristorazione", "Retail", "Servizi", "Personal Care", "Altro"]
-cat_sel = st.sidebar.selectbox("Categoria:", categories)
-custom = st.sidebar.text_input("Custom query (lascia vuoto per categoria):")
-search_term = custom.strip() if custom.strip() else cat_sel
-# Fonti
-enable_demo = st.sidebar.checkbox("Dati Demografici", True)
-enable_trends = st.sidebar.checkbox("Google Trends", True)
-enable_google = st.sidebar.checkbox("Google Reviews", True)
-enable_yelp = st.sidebar.checkbox("Yelp", True)
+category = st.sidebar.selectbox("Categoria:", ['Ristorazione','Retail','Servizi','Personal Care','Altro'])
+custom = st.sidebar.text_input("Custom query:")
+search_term = custom.strip() or category
+sources = {
+    'Demografici': st.sidebar.checkbox("Dati Demografici", True),
+    'Trends': st.sidebar.checkbox("Google Trends", True),
+    'Google Reviews': st.sidebar.checkbox("Google Reviews", True),
+    'Yelp': st.sidebar.checkbox("Yelp", True)
+}
+run = st.sidebar.button("Genera Dashboard")
 
-# Bottone Genera Dashboard
-if st.sidebar.button("Genera Dashboard"):
-    tabs = st.tabs(["Demografici", "Trends", "Competitor", "Mappa"])
-
-    # Demografici
-    if enable_demo:
+if run:
+    tabs = st.tabs(list(sources.keys()) + ['Mappa'])
+    if sources['Demografici']:
         with tabs[0]:
-            st.subheader(f"Dati Demografici per {city_sel}, {state_sel} (ZIP {zip_sel})")
-            try:
-                df_demo = census_api.fetch_demographics_by_zip(zip_sel, api_key=CENSUS_API_KEY)
-                if not df_demo.empty:
-                    st.dataframe(df_demo)
-                    chart = df_demo[["population","median_age","median_income"]].T
-                    chart.columns = [zip_sel]
-                    st.bar_chart(chart)
-                else:
-                    st.warning("Nessun dato demografico disponibile.")
-            except Exception as e:
-                st.error(f"Errore demografici: {e}")
-
-    # Google Trends
-    if enable_trends:
-        with tabs[1]:
-            st.subheader(f"Google Trends per: {search_term}")
-            timeframe = st.selectbox("Intervallo Trends:", ['now 7-d','today 1-m','today 3-m','today 12-m'], key='tf')
-            df_trends = trends_mod.fetch_google_trends(search_term, timeframe=timeframe)
-            if not df_trends.empty:
-                st.line_chart(df_trends['trend_volume'])
+            st.subheader(f"Dati Demografici per {city}, {state} (ZIP {zip_code})")
+            df = fetch_demographics(zip_code)
+            if not df.empty:
+                st.dataframe(df)
+                chart = df[['population','median_age','median_income']].T
+                chart.columns = [zip_code]
+                st.bar_chart(chart)
             else:
-                st.warning("Nessun dato Google Trends disponibile.")
-
-    # Competitor
-    if enable_google or enable_yelp:
+                st.warning("Nessun dato demografico.")
+    if sources['Trends']:
+        with tabs[1]:
+            st.subheader(f"Google Trends: {search_term}")
+            timeframe = st.selectbox("Intervallo:", ['now 7-d','today 1-m','today 3-m','today 12-m'])
+            df = fetch_google_trends(search_term, timeframe)
+            if not df.empty:
+                st.line_chart(df['trend_volume'])
+            else:
+                st.warning("Nessun dato Google Trends.")
+    if sources['Google Reviews']:
         with tabs[2]:
-            st.subheader(f"Analisi Competitor: {search_term}")
-            if enable_google:
-                st.markdown("**Google Reviews**")
-                df_g = google_reviews_mod.fetch_google_reviews(search_term, zip_sel)
-                if not df_g.empty:
-                    st.dataframe(df_g)
-                    if 'name' in df_g.columns and 'user_ratings_total' in df_g.columns:
-                        st.bar_chart(df_g.set_index('name')['user_ratings_total'])
-                else:
-                    st.warning("Nessun risultato Google Reviews.")
-            if enable_yelp:
-                st.markdown("**Yelp**")
-                df_y = yelp_mod.fetch_yelp_competitors(search_term, zip_sel)
-                if not df_y.empty:
-                    st.dataframe(df_y)
-                    if 'name' in df_y.columns and 'review_count' in df_y.columns:
-                        st.bar_chart(df_y.set_index('name')['review_count'])
-                else:
-                    st.warning("Nessun risultato Yelp.")
-
-    # Mappa Interattiva
-    with tabs[3]:
-        st.subheader("Mappa Interattiva dei Competitor")
-        # Placeholder: geocoding da implementare
+            st.subheader(f"Google Reviews: {search_term}")
+            df = fetch_google_reviews(search_term, zip_code)
+            if not df.empty:
+                st.dataframe(df)
+                st.bar_chart(df.set_index('name')['user_ratings_total'])
+            else:
+                st.warning("Nessun Google Reviews.")
+    if sources['Yelp']:
+        with tabs[3]:
+            st.subheader(f"Yelp: {search_term}")
+            df = fetch_yelp_competitors(search_term, zip_code)
+            if not df.empty:
+                st.dataframe(df)
+                st.bar_chart(df.set_index('name')['review_count'])
+            else:
+                st.warning("Nessun Yelp.")
+    # Mappa
+    with tabs[4]:
+        st.subheader("Mappa Interattiva")
         lat, lon = 25.7617, -80.1918
         m = folium.Map(location=[lat, lon], zoom_start=12)
-        if enable_google and 'df_g' in locals() and not df_g.empty:
-            for _, r in df_g.iterrows():
-                folium.Marker([lat, lon], popup=r['name']).add_to(m)
-        if enable_yelp and 'df_y' in locals() and not df_y.empty:
-            for _, r in df_y.iterrows():
-                folium.Marker([lat, lon], icon=folium.Icon(color='red'), popup=r['name']).add_to(m)
-        st_folium(m, width=700)
+        if sources['Google Reviews'] and not df.empty:
+            for _, r in df.iterrows(): folium.Marker([lat, lon], popup=r['name']).add_to(m)
+        if sources['Yelp'] and not df.empty:
+            for _, r in df.iterrows(): folium.Marker([lat, lon], icon=folium.Icon(color='red'), popup=r['name']).add_to(m)
+        st_folium(m)
 else:
-    st.info("Imposta area, settore e fonti, poi clicca 'Genera Dashboard'.")
+    st.info("Configura i parametri nella sidebar e clicca 'Genera Dashboard'.")
+
